@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"text/template"
@@ -130,7 +131,6 @@ func main() {
 			for i := range manifestInspect.Manifests {
 				// 拉取镜像
 				tmpSource := source + "@" + manifestInspect.Manifests[i].Digest
-				tmpTarget := target + "@" + manifestInspect.Manifests[i].Digest
 
 				pullOut, err = cli.ImagePull(ctx, tmpSource, types.ImagePullOptions{})
 				if err != nil {
@@ -139,14 +139,16 @@ func main() {
 				io.Copy(os.Stdout, pullOut)
 
 				// 重新标签
-				err = cli.ImageTag(ctx, tmpSource, tmpTarget)
+				err = cli.ImageTag(ctx, tmpSource, target)
 				if err != nil {
 					panic(err)
 				}
 
 				// 上传镜像
-				pushOut, err = cli.ImagePush(ctx, tmpTarget, types.ImagePushOptions{
+				platform := manifestInspect.Manifests[i].Platform
+				pushOut, err = cli.ImagePush(ctx, target, types.ImagePushOptions{
 					RegistryAuth: authStr,
+					Platform:     filepath.Join(platform.OS, platform.Architecture, platform.Variant),
 				})
 				if err != nil {
 					panic(err)
