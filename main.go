@@ -129,15 +129,15 @@ func main() {
 			}()
 			for i := range manifestInspect.Manifests {
 				// 拉取镜像
-				pullOut, err = cli.ImagePull(ctx, source+"@"+manifestInspect.Manifests[i].Digest,
-					types.ImagePullOptions{})
+				tmpSource := source + "@" + manifestInspect.Manifests[i].Digest
+				pullOut, err = cli.ImagePull(ctx, tmpSource, types.ImagePullOptions{})
 				if err != nil {
 					panic(err)
 				}
 				io.Copy(os.Stdout, pullOut)
 
 				// 重新标签
-				err = cli.ImageTag(ctx, source, target)
+				err = cli.ImageTag(ctx, tmpSource, target)
 				if err != nil {
 					panic(err)
 				}
