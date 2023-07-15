@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/docker/docker/api/types/registry"
 	"io"
 	"os"
 	"os/exec"
@@ -24,6 +25,7 @@ var (
 	maxContent = pflag.IntP("maxContent", "", 10, "原始镜像个数限制")
 	username   = pflag.StringP("username", "", "", "docker hub 用户名")
 	password   = pflag.StringP("password", "", "", "docker hub 密码")
+	auth       = pflag.StringP("auth", "", "", "docker auth秘钥")
 	outputPath = pflag.StringP("outputPath", "", "output.sh", "结果输出路径")
 	repository = pflag.StringP("repository", "", "", "仓库地址,如果为空,默认推到dockerHub")
 )
@@ -54,10 +56,15 @@ func main() {
 	if *username == "" || *password == "" {
 		panic("username or password cannot be empty.")
 	}
-	authConfig := types.AuthConfig{
-		Username:      *username,
-		Password:      *password,
+
+	authConfig := registry.AuthConfig{
 		ServerAddress: *repository,
+	}
+	if *auth != "" {
+		authConfig.Auth = *auth
+	} else {
+		authConfig.Username = *username
+		authConfig.Password = *password
 	}
 	encodedJSON, err := json.Marshal(authConfig)
 	if err != nil {
