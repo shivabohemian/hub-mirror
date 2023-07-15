@@ -52,8 +52,8 @@ func main() {
 	}
 
 	fmt.Println("验证 Docker 用户名密码")
-	if (*username == "" && *password == "") || *auth == "" {
-		panic("username or password cannot be empty.")
+	if *auth == "" && *username == "" && *password == "" {
+		panic("username or password or auth cannot be empty.")
 	}
 
 	authConfig := types.AuthConfig{
