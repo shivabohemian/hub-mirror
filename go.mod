@@ -1,4 +1,4 @@
-module github.com/togettoyou/hub-mirror
+module github.com/shivabohemian/hub-mirror
 
 go 1.17
 

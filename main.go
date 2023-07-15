@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/docker/docker/api/types/registry"
 	"io"
 	"os"
 	"os/exec"
@@ -57,7 +56,7 @@ func main() {
 		panic("username or password cannot be empty.")
 	}
 
-	authConfig := registry.AuthConfig{
+	authConfig := types.AuthConfig{
 		ServerAddress: *repository,
 	}
 	if *auth != "" {
