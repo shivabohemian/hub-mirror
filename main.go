@@ -130,6 +130,8 @@ func main() {
 			for i := range manifestInspect.Manifests {
 				// 拉取镜像
 				tmpSource := source + "@" + manifestInspect.Manifests[i].Digest
+				tmpTarget := target + "@" + manifestInspect.Manifests[i].Digest
+
 				pullOut, err = cli.ImagePull(ctx, tmpSource, types.ImagePullOptions{})
 				if err != nil {
 					panic(err)
@@ -137,13 +139,13 @@ func main() {
 				io.Copy(os.Stdout, pullOut)
 
 				// 重新标签
-				err = cli.ImageTag(ctx, tmpSource, target)
+				err = cli.ImageTag(ctx, tmpSource, tmpTarget)
 				if err != nil {
 					panic(err)
 				}
 
 				// 上传镜像
-				pushOut, err = cli.ImagePush(ctx, target, types.ImagePushOptions{
+				pushOut, err = cli.ImagePush(ctx, tmpTarget, types.ImagePushOptions{
 					RegistryAuth: authStr,
 				})
 				if err != nil {
