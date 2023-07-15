@@ -1,6 +1,6 @@
 module github.com/togettoyou/hub-mirror
 
-go 1.20
+go 1.17
 
 require (
 	github.com/docker/docker v24.0.4+incompatible
