@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"text/template"
@@ -102,32 +103,53 @@ func main() {
 			defer wg.Done()
 
 			fmt.Println("开始转换", source, "=>", target)
+
+			// 获取镜像清单信息并提取 manifest 条目
+			res, _, err := RunCmdWithRes(exec.Command("docker", "manifest", "inspect", source))
+			if err != nil {
+				return
+			}
+			var manifestInspect ManifestInspect
+			err = json.Unmarshal([]byte(res), &manifestInspect)
+			if err != nil {
+				panic(err)
+			}
+
+			// 遍历每个 manifest 条目并同步到目标仓库
 			ctx := context.Background()
+			var pullOut, pushOut io.ReadCloser
+			defer func() {
+				if pullOut != nil {
+					pullOut.Close()
+				}
+				if pushOut != nil {
+					pushOut.Close()
+				}
+			}()
+			for i := range manifestInspect.Manifests {
+				// 拉取镜像
+				pullOut, err = cli.ImagePull(ctx, source+"@"+manifestInspect.Manifests[i].Digest,
+					types.ImagePullOptions{})
+				if err != nil {
+					panic(err)
+				}
+				io.Copy(os.Stdout, pullOut)
 
-			// 拉取镜像
-			pullOut, err := cli.ImagePull(ctx, source, types.ImagePullOptions{})
-			if err != nil {
-				panic(err)
+				// 重新标签
+				err = cli.ImageTag(ctx, source, target)
+				if err != nil {
+					panic(err)
+				}
+
+				// 上传镜像
+				pushOut, err = cli.ImagePush(ctx, target, types.ImagePushOptions{
+					RegistryAuth: authStr,
+				})
+				if err != nil {
+					panic(err)
+				}
+				io.Copy(os.Stdout, pushOut)
 			}
-			defer pullOut.Close()
-			io.Copy(os.Stdout, pullOut)
-
-			// 重新标签
-			err = cli.ImageTag(ctx, source, target)
-			if err != nil {
-				panic(err)
-			}
-
-			// 上传镜像
-			pushOut, err := cli.ImagePush(ctx, target, types.ImagePushOptions{
-				RegistryAuth: authStr,
-			})
-			if err != nil {
-				panic(err)
-			}
-			defer pushOut.Close()
-			io.Copy(os.Stdout, pushOut)
-
 			output = append(output, struct {
 				Source     string
 				Target     string

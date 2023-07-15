@@ -4,13 +4,9 @@
 
 为减少重复请求，合理利用资源，建议提前在 issues 搜索镜像是否已转换过
 
+感谢原项目[togettoyou/hub-mirror](https://github.com/togettoyou/hub-mirror)作者！本项目优化原来只同步amd64架构镜像的问题，同步多平台多架构镜像，觉得不错的可以Star一下，谢谢！！！
+
 示例：[issues搜索gcr.io/google-samples/microservices-demo/emailservice:v0.3.5](https://github.com/togettoyou/hub-mirror/issues?q=gcr.io%2Fgoogle-samples%2Fmicroservices-demo%2Femailservice%3Av0.3.5)
-
-# 原理
-
-[无法拉取 gcr.io 镜像？用魔法来打败魔法](https://mp.weixin.qq.com/s/Vt0FRTx1PsoYFdLa0QZzWw)
-
-<img src="https://user-images.githubusercontent.com/55381228/221747734-13783ce6-1969-4c10-acd6-833f5046aa85.png" width="300px">
 
 # 开始使用
 
