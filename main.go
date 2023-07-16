@@ -3,13 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"text/template"
@@ -24,7 +22,6 @@ var (
 	maxContent = pflag.IntP("maxContent", "", 10, "原始镜像个数限制")
 	username   = pflag.StringP("username", "", "", "docker hub 用户名")
 	password   = pflag.StringP("password", "", "", "docker hub 密码")
-	auth       = pflag.StringP("auth", "", "", "docker auth秘钥")
 	outputPath = pflag.StringP("outputPath", "", "output.sh", "结果输出路径")
 	repository = pflag.StringP("repository", "", "", "仓库地址,如果为空,默认推到dockerHub")
 )
@@ -52,26 +49,12 @@ func main() {
 	}
 
 	fmt.Println("验证 Docker 用户名密码")
-	if *auth == "" && *username == "" && *password == "" {
+	if *username == "" || *password == "" {
 		panic("username or password or auth cannot be empty.")
 	}
-
-	authConfig := types.AuthConfig{
-		ServerAddress: *repository,
-	}
-	if *auth != "" {
-		authConfig.Auth = *auth
-	} else {
-		authConfig.Username = *username
-		authConfig.Password = *password
-	}
-	encodedJSON, err := json.Marshal(authConfig)
+	outStr, errStr, err := RunCmdWithRes(exec.Command("docker", "login", "--username="+*username, "--password="+*password, *repository))
 	if err != nil {
-		panic(err)
-	}
-	authStr := base64.URLEncoding.EncodeToString(encodedJSON)
-	_, err = cli.RegistryLogin(context.Background(), authConfig)
-	if err != nil {
+		fmt.Println("认证错误:", outStr, errStr, err)
 		panic(err)
 	}
 
@@ -123,44 +106,52 @@ func main() {
 				panic(err)
 			}
 
-			// 遍历每个 manifest 条目并同步到目标仓库
 			ctx := context.Background()
-			var pullOut, pushOut io.ReadCloser
-			defer func() {
-				if pullOut != nil {
-					pullOut.Close()
-				}
-				if pushOut != nil {
-					pushOut.Close()
-				}
-			}()
-			for i := range manifestInspect.Manifests {
+			// manifest参数
+			manifestCmdArgs := []string{"manifest", "create", "--amend", target}
+			// 遍历拉取 manifest 条目并重新标签
+			for _, manifest := range manifestInspect.Manifests {
 				// 拉取镜像
-				tmpSource := source + "@" + manifestInspect.Manifests[i].Digest
+				tmpSource := source + "@" + manifest.Digest
+				tmpTarget := target + "-" + manifest.Platform.OS + "-" + manifest.Platform.Architecture
+				if manifest.Platform.Variant != "" {
+					tmpTarget = tmpTarget + manifest.Platform.Variant
+				}
 
-				pullOut, err = cli.ImagePull(ctx, tmpSource, types.ImagePullOptions{})
+				pullOut, err := cli.ImagePull(ctx, tmpSource, types.ImagePullOptions{})
 				if err != nil {
-					panic(err)
+					continue
 				}
 				io.Copy(os.Stdout, pullOut)
+				pullOut.Close()
 
 				// 重新标签
-				err = cli.ImageTag(ctx, tmpSource, target)
+				err = cli.ImageTag(ctx, tmpSource, tmpTarget)
 				if err != nil {
-					panic(err)
+					continue
 				}
 
 				// 上传镜像
-				platform := manifestInspect.Manifests[i].Platform
-				pushOut, err = cli.ImagePush(ctx, target, types.ImagePushOptions{
-					RegistryAuth: authStr,
-					Platform:     filepath.Join(platform.OS, platform.Architecture, platform.Variant),
-				})
+				_, _, err = RunCmdWithRes(exec.Command("docker", "push", tmpTarget))
 				if err != nil {
-					panic(err)
+					continue
 				}
-				io.Copy(os.Stdout, pushOut)
+				manifestCmdArgs = append(manifestCmdArgs, tmpTarget)
 			}
+			// 创建manifest
+			createCmd := exec.Command("docker", manifestCmdArgs...)
+			_, errStr, err = RunCmdWithRes(createCmd)
+			if err != nil {
+				fmt.Println("创建manifest错误：", errStr)
+				panic(err)
+			}
+			// 推送manifest及镜像
+			_, errStr, err = RunCmdWithRes(exec.Command("docker", "manifest", "push", "--purge", target))
+			if err != nil {
+				fmt.Println("推送manifest错误：", errStr)
+				panic(err)
+			}
+
 			output = append(output, struct {
 				Source     string
 				Target     string
